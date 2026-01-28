@@ -163,38 +163,40 @@ const ScaleCard = ({ year, month, events }: ScaleCardProps) => {
 
   const renderCalendarView = () => (
     <div className="scale-card-calendar">
-      <div className="calendar-weekdays">
-        {WEEKDAY_ORDER.map((weekday) => (
-          <span key={weekday}>{weekday}</span>
-        ))}
-      </div>
-      <div className="calendar-weeks">
-        {weeks.map((week, index) => (
-          <div key={`week-${index}`} className="calendar-week">
-            {week.map((cell, cellIndex) => (
-              <div
-                key={`${index}-${cellIndex}`}
-                className={`calendar-cell ${cell.dayNumber ? '' : 'calendar-cell-empty'} ${
-                  cell.weekday === 'DOM' ? 'calendar-cell-dom' : ''
-                }`}
-              >
-                {cell.dayNumber && (
-                  <span className="calendar-day-number">{pad(cell.dayNumber)}</span>
-                )}
-                {cell.event && (
-                  <div className="calendar-event">
-                    <span className="calendar-event-ministry cellText">
-                      {cell.event.ministryName}
-                    </span>
-                    {cell.event.note && (
-                      <small className="calendar-event-note">{cell.event.note}</small>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        ))}
+      <div className="scale-card-calendar-scroll-inner">
+        <div className="calendar-weekdays">
+          {WEEKDAY_ORDER.map((weekday) => (
+            <span key={weekday}>{weekday}</span>
+          ))}
+        </div>
+        <div className="calendar-weeks">
+          {weeks.map((week, index) => (
+            <div key={`week-${index}`} className="calendar-week">
+              {week.map((cell, cellIndex) => (
+                <div
+                  key={`${index}-${cellIndex}`}
+                  className={`calendar-cell ${cell.dayNumber ? '' : 'calendar-cell-empty'} ${
+                    cell.weekday === 'DOM' ? 'calendar-cell-dom' : ''
+                  }`}
+                >
+                  {cell.dayNumber && (
+                    <span className="calendar-day-number">{pad(cell.dayNumber)}</span>
+                  )}
+                  {cell.event && (
+                    <div className="calendar-event">
+                      <span className="calendar-event-ministry">
+                        {cell.event.ministryName}
+                      </span>
+                      {cell.event.note && (
+                        <small className="calendar-event-note">{cell.event.note}</small>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
