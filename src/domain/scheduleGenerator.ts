@@ -38,19 +38,26 @@ const normalizeMinistries = (ministries: string[]) => {
 
 const getWeekdayKey = (date: DayjsLike): Weekday => WEEKDAY_ORDER[date.day()];
 
-const applyFifthSundayRule = (events: ScheduleEvent[], ministry: string): ScheduleEvent[] => {
-  if (!ministry) return events;
-  const sundayCount = new Map<string, number>();
-  return events.map((event) => {
-    if (event.weekday !== 'DOM') return event;
-    const monthKey = event.date.slice(0, 7);
-    const next = (sundayCount.get(monthKey) ?? 0) + 1;
-    sundayCount.set(monthKey, next);
-    if (next === 5) {
-      return { ...event, ministryName: ministry };
-    }
-    return event;
-  });
+const buildWeeklyMinistries = (year: number, ministries: string[], fifthSundayMinistry: string) => {
+  const start = dayjs(`${year}-01-01`).startOf('week');
+  const lastSunday = dayjs(`${year}-12-31`).startOf('week');
+  const weekMinistryMap = new Map<string, string>();
+  const sundayCountByMonth = new Map<string, number>();
+  let rotationIndex = 0;
+
+  for (let current = start; current.isSameOrBefore(lastSunday, 'day'); current = current.add(1, 'week')) {
+    const monthKey = current.format('YYYY-MM');
+    const nextCount = (sundayCountByMonth.get(monthKey) ?? 0) + 1;
+    sundayCountByMonth.set(monthKey, nextCount);
+    const isFifth = nextCount === 5 && fifthSundayMinistry.trim().length;
+    const ministryName = isFifth
+      ? fifthSundayMinistry
+      : ministries[rotationIndex % ministries.length];
+    rotationIndex += 1;
+    weekMinistryMap.set(current.format('YYYY-MM-DD'), ministryName);
+  }
+
+  return weekMinistryMap;
 };
 
 export const generateYearSchedule = (config: ScheduleConfig): ScheduleEvent[] => {
@@ -58,25 +65,25 @@ export const generateYearSchedule = (config: ScheduleConfig): ScheduleEvent[] =>
   if (!normalizedWeekdays.length) return [];
 
   const ministries = normalizeMinistries(config.ministries);
+  const weeklyMinistries = buildWeeklyMinistries(config.year, ministries, config.fifthSundayMinistry);
   const start = dayjs(`${config.year}-01-01`);
   const end = dayjs(`${config.year}-12-31`);
   const events: ScheduleEvent[] = [];
-  let rotationIndex = 0;
 
   for (let current = start; current.isSameOrBefore(end, 'day'); current = current.add(1, 'day')) {
     const weekday = getWeekdayKey(current);
     if (!normalizedWeekdays.includes(weekday)) continue;
-
-    const ministryName = ministries[rotationIndex % ministries.length];
+    const sundayKey = current.startOf('week').format('YYYY-MM-DD');
+    const ministryName = weeklyMinistries.get(sundayKey);
+    if (!ministryName) continue;
     events.push({
       date: current.format('YYYY-MM-DD'),
       weekday,
       ministryName,
       type: 'regular',
     });
-    rotationIndex += 1;
   }
 
-  return applyFifthSundayRule(events, config.fifthSundayMinistry);
+  return events;
 };
 

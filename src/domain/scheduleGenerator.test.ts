@@ -1,9 +1,9 @@
-﻿import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { generateYearSchedule } from './scheduleGenerator';
 import { mergeScheduleWithExceptions } from './exceptionsStore';
 
 describe('schedule generator', () => {
-  it('rotates ministries across the year without resetting per month', () => {
+  it('rotates ministries only on Sundays and keeps Tuesday/Thursday aligned', () => {
     const events = generateYearSchedule({
       year: 2026,
       ministries: ['Arcanjos', 'Viver é Cristo', 'Ágape'],
@@ -11,29 +11,47 @@ describe('schedule generator', () => {
       fifthSundayMinistry: '',
     });
 
-    const firstSix = events.slice(0, 6).map((event) => event.ministryName);
+    const sundayMinistries = events
+      .filter((event) => event.weekday === 'DOM')
+      .slice(0, 6)
+      .map((event) => event.ministryName);
 
-    expect(firstSix).toEqual([
-      'Arcanjos',
-      'Viver é Cristo',
-      'Ágape',
-      'Arcanjos',
-      'Viver é Cristo',
-      'Ágape',
-    ]);
+    const cycle = ['Arcanjos', 'Viver é Cristo', 'Ágape'];
+    const offset = cycle.indexOf(sundayMinistries[0]);
+    expect(offset).not.toBe(-1);
+    const expected = Array.from({ length: sundayMinistries.length }, (_, index) => {
+      return cycle[(index + offset) % cycle.length];
+    });
+    expect(sundayMinistries).toEqual(expected);
+
+    const weekEvents = ['2026-01-04', '2026-01-06', '2026-01-08'].map((date) =>
+      events.find((event) => event.date === date)
+    );
+
+    const ministry = weekEvents[0]?.ministryName;
+    expect(ministry).toBeDefined();
+    weekEvents.forEach((event) => {
+      expect(event?.ministryName).toBe(ministry);
+    });
   });
 
-  it('applies the configured ministry on the 5th Sunday of the month', () => {
+  it('applies the configured ministry on the 5th Sunday and keeps week alignment', () => {
     const events = generateYearSchedule({
       year: 2026,
       ministries: ['Equipe A', 'Equipe B'],
-      activeWeekdays: ['DOM'],
+      activeWeekdays: ['DOM', 'TER', 'QUI'],
       fifthSundayMinistry: 'Joias de Cristo',
     });
 
     const fifthSunday = events.find((event) => event.date === '2026-08-30');
     expect(fifthSunday).toBeDefined();
     expect(fifthSunday?.ministryName).toBe('Joias de Cristo');
+
+    ['2026-08-30', '2026-09-01', '2026-09-03'].forEach((date) => {
+      const weekEvent = events.find((event) => event.date === date);
+      expect(weekEvent).toBeDefined();
+      expect(weekEvent?.ministryName).toBe('Joias de Cristo');
+    });
   });
 
   it('lets exceptions override any date and add new events', () => {
