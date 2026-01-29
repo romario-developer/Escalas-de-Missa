@@ -1,8 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import dayjs from 'dayjs';
 import { toPng } from 'html-to-image';
 import { WEEKDAY_ORDER, type Weekday } from '../domain/scheduleGenerator';
 import { type ScheduleEvent } from '../domain/scheduleGenerator';
+
+export type ScaleCardHandle = {
+  exportCard: () => Promise<void>;
+};
 
 type ScaleCardView = 'calendar' | 'scale';
 type ScaleWeekday = 'DOM' | 'TER' | 'QUI';
@@ -18,6 +30,7 @@ interface ScaleCardProps {
   year: number;
   month: number;
   events: ScheduleEvent[];
+  onExportStateChange?: (isExporting: boolean) => void;
 }
 
 const SCALE_CARD_VIEW_KEY = 'scaleCardView';
@@ -89,12 +102,20 @@ const buildCalendarMatrix = (
   return weeks;
 };
 
-const ScaleCard = ({ year, month, events }: ScaleCardProps) => {
-  const previewRef = useRef<HTMLDivElement>(null);
+const ScaleCard = forwardRef<ScaleCardHandle, ScaleCardProps>(
+  ({ year, month, events, onExportStateChange }, ref) => {
+    const previewRef = useRef<HTMLDivElement>(null);
   const exportRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [view, setView] = useState<ScaleCardView>(() => getInitialView());
   const isMobile = useIsMobile();
+  const updateExportingState = useCallback(
+    (value: boolean) => {
+      setIsExporting(value);
+      onExportStateChange?.(value);
+    },
+    [onExportStateChange]
+  );
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -137,11 +158,11 @@ const ScaleCard = ({ year, month, events }: ScaleCardProps) => {
     scale: 'Mostra apenas dias de missa em colunas (DOM/TER/QUI). Ideal para escala objetiva.',
   };
 
-  const exportCard = async () => {
+  const exportCard = useCallback(async () => {
     const target = exportRef.current;
     if (!target) return;
     try {
-      setIsExporting(true);
+      updateExportingState(true);
       await document.fonts.ready;
       const dataUrl = await toPng(target, {
         pixelRatio: 3,
@@ -157,9 +178,11 @@ const ScaleCard = ({ year, month, events }: ScaleCardProps) => {
     } catch (error) {
       console.error('Falha ao gerar imagem', error);
     } finally {
-      setIsExporting(false);
+      updateExportingState(false);
     }
-  };
+  }, [monthName, year, updateExportingState]);
+
+  useImperativeHandle(ref, () => ({ exportCard }), [exportCard]);
 
   const renderCalendarView = () => (
     <div className="scale-card-calendar">
@@ -323,6 +346,9 @@ const ScaleCard = ({ year, month, events }: ScaleCardProps) => {
       </div>
     </div>
   );
-};
+  }
+);
+
+ScaleCard.displayName = 'ScaleCard';
 
 export default ScaleCard;

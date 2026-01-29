@@ -1,15 +1,17 @@
-import { useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useMemo, useRef, useState, useEffect, type ChangeEvent } from 'react';
 import dayjs from 'dayjs';
-import ScaleCard from '../components/ScaleCard';
+import ScaleCard, { type ScaleCardHandle } from '../components/ScaleCard';
 import MonthlyCalendar from '../components/MonthlyCalendar';
 import EditEventDrawer from '../components/EditEventDrawer';
 import {
+  type Ministry,
   type ScheduleConfig,
   type ScheduleEvent,
   WEEKDAY_ORDER,
   type Weekday,
 } from '../domain/scheduleGenerator';
 import { type ExceptionEvent } from '../domain/exceptionsStore';
+import { generateStableId } from '../utils/ids';
 
 interface AppTabsProps {
   config: ScheduleConfig;
@@ -55,6 +57,11 @@ const AppTabs = ({
     event: undefined as ScheduleEvent | undefined,
   });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const scaleCardRef = useRef<ScaleCardHandle | null>(null);
+  const [isCardExporting, setIsCardExporting] = useState(false);
+  const [draftMinistries, setDraftMinistries] = useState<Ministry[]>(config.ministries);
+  const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const pendingAutoFocusId = useRef<string | null>(null);
 
   const exceptionSet = useMemo(() => new Set(exceptions.map((item) => item.date)), [exceptions]);
 
@@ -66,6 +73,20 @@ const AppTabs = ({
   const monthString = String(selectedMonth).padStart(2, '0');
   const monthName = dayjs(config.year + '-' + monthString + '-01').format('MMMM');
 
+  useEffect(() => {
+    setDraftMinistries(config.ministries);
+  }, [config.ministries]);
+
+  useEffect(() => {
+    if (!pendingAutoFocusId.current) return;
+    const node = inputRefs.current[pendingAutoFocusId.current];
+    if (node) {
+      node.focus();
+      node.select();
+    }
+    pendingAutoFocusId.current = null;
+  }, [draftMinistries]);
+
   const openEditor = (date: string, event?: ScheduleEvent) => {
     setEditor({ isOpen: true, date, event });
   };
@@ -76,10 +97,6 @@ const AppTabs = ({
 
   const handleMonthChange = (event: ChangeEvent<HTMLSelectElement>) => {
     onMonthChange(Number(event.target.value));
-  };
-
-  const updateMinistryOrder = (ministries: string[]) => {
-    onConfigChange({ ...config, ministries });
   };
 
   const toggleWeekday = (weekday: Weekday) => {
@@ -104,6 +121,54 @@ const AppTabs = ({
     };
     reader.readAsText(file);
     event.target.value = '';
+  };
+
+  const commitMinistries = () => {
+    const hasDifferentNames =
+      draftMinistries.length !== config.ministries.length ||
+      draftMinistries.some((ministry, index) => ministry.name !== config.ministries[index]?.name);
+    if (!hasDifferentNames) return;
+    onConfigChange({ ...config, ministries: draftMinistries.map((ministry) => ({ ...ministry })) });
+  };
+
+  const handleMinistryChange = (id: string, value: string) => {
+    setDraftMinistries((prev) =>
+      prev.map((ministry) => (ministry.id === id ? { ...ministry, name: value } : ministry))
+    );
+  };
+
+  const moveMinistry = (id: string, direction: 'up' | 'down') => {
+    setDraftMinistries((prev) => {
+      const index = prev.findIndex((item) => item.id === id);
+      if (index === -1) return prev;
+      const swapIndex = direction === 'up' ? index - 1 : index + 1;
+      if (swapIndex < 0 || swapIndex >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
+      onConfigChange({ ...config, ministries: next.map((item) => ({ ...item })) });
+      return next;
+    });
+  };
+
+  const removeMinistry = (id: string) => {
+    setDraftMinistries((prev) => {
+      if (prev.length <= 1) return prev;
+      const next = prev.filter((item) => item.id !== id);
+      onConfigChange({ ...config, ministries: next.map((item) => ({ ...item })) });
+      return next.length ? next : prev;
+    });
+  };
+
+  const addMinistry = () => {
+    const nextMinistry: Ministry = { id: generateStableId(), name: '' };
+    const next = [...draftMinistries, nextMinistry];
+    setDraftMinistries(next);
+    pendingAutoFocusId.current = nextMinistry.id;
+    onConfigChange({ ...config, ministries: next.map((item) => ({ ...item })) });
+  };
+
+  const handleCardExport = () => {
+    scaleCardRef.current?.exportCard();
   };
 
   return (
@@ -177,7 +242,25 @@ const AppTabs = ({
                   <small>Use o Calendário para mudar o mês</small>
                 </div>
               </div>
-              <ScaleCard year={config.year} month={selectedMonth} events={monthEvents} />
+              <div className="card-tab-content">
+                <ScaleCard
+                  ref={scaleCardRef}
+                  year={config.year}
+                  month={selectedMonth}
+                  events={monthEvents}
+                  onExportStateChange={setIsCardExporting}
+                />
+              </div>
+              <div className="card-actions-mobile">
+                <button
+                  className="button primary"
+                  type="button"
+                  onClick={handleCardExport}
+                  disabled={isCardExporting}
+                >
+                  {isCardExporting ? 'Gerando PNG...' : 'Exportar PNG'}
+                </button>
+              </div>
             </>
           )}
 
@@ -186,46 +269,35 @@ const AppTabs = ({
               <div className="setting-card">
                 <h4>Rotação de ministérios</h4>
                 <div className="list-stack">
-                  {config.ministries.map((ministry, index) => (
-                    <div key={`${ministry}-${index}`} className="list-item">
+                  {draftMinistries.map((ministry, index) => (
+                    <div key={ministry.id} className="list-item">
                       <input
-                        value={ministry}
-                        onChange={(event) => {
-                          const next = [...config.ministries];
-                          next[index] = event.target.value;
-                          updateMinistryOrder(next);
+                        ref={(node) => {
+                          if (node) inputRefs.current[ministry.id] = node;
                         }}
+                        value={ministry.name}
+                        onChange={(event) => handleMinistryChange(ministry.id, event.target.value)}
+                        onBlur={commitMinistries}
                       />
                       <div className="list-actions">
                         <button
                           type="button"
                           disabled={index === 0}
-                          onClick={() => {
-                            const next = [...config.ministries];
-                            [next[index - 1], next[index]] = [next[index], next[index - 1]];
-                            updateMinistryOrder(next);
-                          }}
+                          onClick={() => moveMinistry(ministry.id, 'up')}
                         >
                           ↑
                         </button>
                         <button
                           type="button"
-                          disabled={index === config.ministries.length - 1}
-                          onClick={() => {
-                            const next = [...config.ministries];
-                            [next[index], next[index + 1]] = [next[index + 1], next[index]];
-                            updateMinistryOrder(next);
-                          }}
+                          disabled={index === draftMinistries.length - 1}
+                          onClick={() => moveMinistry(ministry.id, 'down')}
                         >
                           ↓
                         </button>
                         <button
                           type="button"
-                          disabled={config.ministries.length <= 1}
-                          onClick={() => {
-                            const next = config.ministries.filter((_, i) => i !== index);
-                            updateMinistryOrder(next.length ? next : [config.ministries[index]]);
-                          }}
+                          disabled={draftMinistries.length <= 1}
+                          onClick={() => removeMinistry(ministry.id)}
                         >
                           ✕
                         </button>
@@ -233,11 +305,7 @@ const AppTabs = ({
                     </div>
                   ))}
                 </div>
-                <button
-                  type="button"
-                  className="button secondary"
-                  onClick={() => updateMinistryOrder([...config.ministries, 'Novo Ministério'])}
-                >
+                <button type="button" className="button secondary" onClick={addMinistry}>
                   Adicionar ministério
                 </button>
               </div>

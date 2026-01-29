@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { generateYearSchedule } from './scheduleGenerator';
+import { generateYearSchedule, type Ministry } from './scheduleGenerator';
 import { mergeScheduleWithExceptions } from './exceptionsStore';
+
+const buildMinistries = (names: string[]): Ministry[] =>
+  names.map((name, index) => ({ id: `min-${index}-${name}`, name }));
 
 describe('schedule generator', () => {
   it('rotates ministries only on Sundays and keeps Tuesday/Thursday aligned', () => {
     const events = generateYearSchedule({
       year: 2026,
-      ministries: ['Arcanjos', 'Viver é Cristo', 'Ágape'],
+      ministries: buildMinistries(['Arcanjos', 'Viver é Cristo', 'Ágape']),
       activeWeekdays: ['DOM', 'TER', 'QUI'],
       fifthSundayMinistry: '',
     });
@@ -38,7 +41,7 @@ describe('schedule generator', () => {
   it('applies the configured ministry on the 5th Sunday and keeps week alignment', () => {
     const events = generateYearSchedule({
       year: 2026,
-      ministries: ['Equipe A', 'Equipe B'],
+      ministries: buildMinistries(['Equipe A', 'Equipe B']),
       activeWeekdays: ['DOM', 'TER', 'QUI'],
       fifthSundayMinistry: 'Joias de Cristo',
     });
@@ -57,7 +60,7 @@ describe('schedule generator', () => {
   it('lets exceptions override any date and add new events', () => {
     const base = generateYearSchedule({
       year: 2026,
-      ministries: ['Arcanjos', 'Viver é Cristo'],
+      ministries: buildMinistries(['Arcanjos', 'Viver é Cristo']),
       activeWeekdays: ['DOM'],
       fifthSundayMinistry: '',
     });

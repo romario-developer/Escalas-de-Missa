@@ -196,6 +196,37 @@ body {
   gap: 12px;
 }
 
+.card-tab-content {
+  position: relative;
+}
+
+.card-actions-mobile {
+  position: sticky;
+  bottom: 0;
+  width: 100%;
+  display: none;
+  justify-content: center;
+  padding: 1rem clamp(1.5rem, 2vw, 2.5rem) calc(1rem + env(safe-area-inset-bottom, 0));
+  background: var(--bg-1);
+  border-top: 1px solid rgba(47, 47, 47, 0.08);
+  box-shadow: 0 -10px 24px rgba(0, 0, 0, 0.08);
+  z-index: 12;
+}
+
+.card-actions-mobile .button {
+  width: 100%;
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .card-actions-mobile {
+    display: flex;
+  }
+  .card-tab-content {
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0));
+  }
+}
+
 .scale-card {
   border-radius: 22px;
   overflow: hidden;

@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import type { ExceptionEvent } from '../domain/exceptionsStore';
-import { type ScheduleEvent, type EventType } from '../domain/scheduleGenerator';
+import { type Ministry, type ScheduleEvent, type EventType } from '../domain/scheduleGenerator';
 
 interface EditEventDrawerProps {
   isOpen: boolean;
   date: string | null;
   event?: ScheduleEvent;
   hasException?: boolean;
-  ministries: string[];
+  ministries: Ministry[];
   onClose: () => void;
   onSave: (payload: ExceptionEvent) => void;
   onRemove: (date: string) => void;
@@ -35,7 +35,9 @@ const EditEventDrawer = ({
 
   if (!isOpen || !date) return null;
 
-  const presetList = Array.from(new Set(ministries.map((item) => item.trim()).filter(Boolean)));
+  const presetList = Array.from(
+    new Set(ministries.map((item) => item.name.trim()).filter(Boolean))
+  );
   const isPreset = presetList.includes(ministry);
   const selectValue = isPreset ? ministry : 'custom';
   const minValue = ministry.trim() || 'Ministério';

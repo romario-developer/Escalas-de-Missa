@@ -1,29 +1,53 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import AppTabs from './pages/AppTabs';
 import { loadExceptions, mergeScheduleWithExceptions, saveExceptions } from './domain/exceptionsStore';
 import type { ExceptionEvent } from './domain/exceptionsStore';
 import { generateYearSchedule } from './domain/scheduleGenerator';
-import type { ScheduleConfig, ScheduleEvent } from './domain/scheduleGenerator';
+import type { Ministry, ScheduleConfig, ScheduleEvent, Weekday } from './domain/scheduleGenerator';
 import { loadFromStorage, saveToStorage } from './utils/storage';
+import { generateStableId } from './utils/ids';
 
 const CONFIG_STORAGE_KEY = 'appescalas-config';
-const DEFAULT_CONFIG: ScheduleConfig = {
-  year: 2026,
-  ministries: ['Arcanjos', 'Viver é Cristo', 'Ágape'],
-  activeWeekdays: ['DOM', 'TER', 'QUI'],
-  fifthSundayMinistry: 'Joias de Cristo',
+const DEFAULT_YEAR = 2026;
+const DEFAULT_MINISTRY_NAMES = ['Arcanjos', 'Viver é Cristo', 'Ágape'] as const;
+const DEFAULT_ACTIVE_WEEKDAYS: Weekday[] = ['DOM', 'TER', 'QUI'];
+const DEFAULT_FIFTH_SUNDAY_MINISTRY = 'Joias de Cristo';
+
+const createMinistryRecord = (name = '', id?: string): Ministry => ({
+  id: id ?? generateStableId(),
+  name: name?.trim() ?? '',
+});
+
+const buildMinistriesFromInput = (input?: (Ministry | string)[]): Ministry[] => {
+  if (!input || !input.length) {
+    return DEFAULT_MINISTRY_NAMES.map((entry) => createMinistryRecord(entry));
+  }
+  return input.map((entry) => {
+    if (typeof entry === 'string') {
+      return createMinistryRecord(entry);
+    }
+    return createMinistryRecord(entry.name, entry.id);
+  });
 };
 
+const buildDefaultConfig = (): ScheduleConfig => ({
+  year: DEFAULT_YEAR,
+  ministries: buildMinistriesFromInput(DEFAULT_MINISTRY_NAMES as string[]),
+  activeWeekdays: [...DEFAULT_ACTIVE_WEEKDAYS],
+  fifthSundayMinistry: DEFAULT_FIFTH_SUNDAY_MINISTRY,
+});
+
 const normalizeConfig = (value?: Partial<ScheduleConfig> | null): ScheduleConfig => {
-  if (!value) return DEFAULT_CONFIG;
+  const base = buildDefaultConfig();
+  if (!value) return base;
   return {
-    ...DEFAULT_CONFIG,
+    ...base,
     ...value,
-    ministries: value.ministries?.length ? value.ministries : DEFAULT_CONFIG.ministries,
-    activeWeekdays: value.activeWeekdays?.length ? value.activeWeekdays : DEFAULT_CONFIG.activeWeekdays,
-    fifthSundayMinistry: value.fifthSundayMinistry ?? DEFAULT_CONFIG.fifthSundayMinistry,
-    year: value.year ?? DEFAULT_CONFIG.year,
+    ministries: buildMinistriesFromInput(value.ministries ?? base.ministries),
+    activeWeekdays: value.activeWeekdays?.length ? value.activeWeekdays : base.activeWeekdays,
+    fifthSundayMinistry: value.fifthSundayMinistry ?? base.fifthSundayMinistry,
+    year: value.year ?? base.year,
   };
 };
 
@@ -109,4 +133,3 @@ function App() {
 }
 
 export default App;
-

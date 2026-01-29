@@ -6,9 +6,14 @@ dayjs.extend(isSameOrBefore);
 export type Weekday = 'DOM' | 'SEG' | 'TER' | 'QUA' | 'QUI' | 'SEX' | 'SAB';
 export type EventType = 'regular' | 'extra';
 
+export interface Ministry {
+  id: string;
+  name: string;
+}
+
 export interface ScheduleConfig {
   year: number;
-  ministries: string[];
+  ministries: Ministry[];
   activeWeekdays: Weekday[];
   fifthSundayMinistry: string;
 }
@@ -31,8 +36,8 @@ const normalizeWeekdays = (weekdays: Weekday[] | undefined) => {
     .filter((day) => WEEKDAY_ORDER.includes(day));
 };
 
-const normalizeMinistries = (ministries: string[]) => {
-  const filtered = ministries.map((name) => name.trim()).filter(Boolean);
+const normalizeMinistries = (ministries: Ministry[]) => {
+  const filtered = ministries.map((ministry) => ministry.name.trim()).filter(Boolean);
   return filtered.length ? filtered : ['Ministerio'];
 };
 
